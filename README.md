@@ -23,6 +23,22 @@ To improve transparency and replicability of speech recognition results, we give
 
 [See a short introductory video on the PyTorch-Kaldi Toolkit](https://www.youtube.com/watch?v=VDQaf0SS4K0&t=2s)
 
+## Next Version: SpeechBrain 
+We are happy to announce the SpeechBrain project (https://speechbrain.github.io/), that aims to develop an **open-source all-in-one** toolkit based on PyTorch. The SpeechBrain project will significantly extend the functionality of the current PyTorch-Kaldi toolkit. 
+
+The goal is to develop a *single*, *flexible*, and *user-friendly* toolkit that can be used to easily develop state-of-the-art speech systems for speech recognition (both end-to-end and HMM-DNN), speaker recognition, speech separation, multi-microphone signal processing (e.g, beamforming), self-supervised learning, and many others.
+
+The project will be lead by Mila and is sponsored by Samsung, Nvidia, Dolby. 
+SpeechBrain will also benefit from the collaboration and expertise of other companies such as Facebook/PyTorch, IBMResearch, FluentAI. 
+
+We are actively looking for collaborators. Feel free to contact us at speechbrainproject@gmail.com if you are interested to collaborate.
+
+Thanks to our sponsors we are also able to hire interns working at Mila on the SpeechBrain project. The ideal candidate is a PhD student with experience on pytorch and speech technologies (send your CV to speechbrainproject@gmail.com)
+
+The development of SpeechBrain will require some months before having a working repository. Meanwhile, we will continue providing support for the pytorch-kaldi project.
+
+Stay Tuned!
+
 
 ## Table of Contents
 * [Introduction](#introduction)
@@ -78,7 +94,7 @@ PATH=$PATH:$KALDI_ROOT/src/bin
 PATH=$PATH:$KALDI_ROOT//src/nnetbin
 export PATH
 ```
-As a first test to check the installation, open a bash shell, type "copy-feats" or "hmm-info" and make sure no errors appear.
+Remember to change the KALDI_ROOT variable using your path. As a first test to check the installation, open a bash shell, type "copy-feats" or "hmm-info" and make sure no errors appear.
 
 2. If not already done, install PyTorch (http://pytorch.org/). We tested our codes on PyTorch 1.0 and PyTorch 0.4. An older version of PyTorch is likely to raise errors. To check your installation, type “python” and, once entered into the console, type “import torch”, and make sure no errors appear.
 
@@ -127,7 +143,15 @@ In the following, we provide a short tutorial of the PyTorch-Kaldi toolkit based
 
 2. Make sure Kaldi and PyTorch installations are fine. Make also sure that your KALDI paths are currently working (you should add the Kaldi paths into the .bashrc as reported in the section "Prerequisites"). For instance, type "copy-feats" and "hmm-info" and make sure no errors appear. 
 
-3. Run the Kaldi s5 baseline of TIMIT. This step is necessary to compute features and labels later used to train the PyTorch neural network. We recommend running the full timit s5 recipe (including the DNN training). This way all the necessary files are created and the user can directly compare the results obtained by Kaldi with that achieved with our toolkit.
+3. Run the Kaldi s5 baseline of TIMIT. This step is necessary to compute features and labels later used to train the PyTorch neural network. We recommend running the full timit s5 recipe (including the DNN training): 
+
+```
+cd kaldi/egs/timit/s5
+./run.sh
+./local/nnet/run_dnn.sh
+```
+
+This way all the necessary files are created and the user can directly compare the results obtained by Kaldi with that achieved with our toolkit.
 
 4. Compute the alignments (i.e, the phone-state labels) for test and dev data with the following commands (go into $KALDI_ROOT/egs/timit/s5). If you want to use tri3 alignments, type:
 ```
@@ -222,6 +246,7 @@ There are some examples with recurrent (TIMIT_RNN*,TIMIT_LSTM*,TIMIT_GRU*,TIMIT_
 |  Kaldi DNN Baseline | -----| ------| 18.5 |
 |  MLP  | 18.2 | 18.7 | 16.7 | 
 |  RNN  | 17.7 | 17.2 | 15.9 | 
+|  SRU  | -----| 16.6 | -----|
 |LSTM| 15.1  | 14.3  |14.5  | 
 |GRU| 16.0 | 15.2|  14.9 | 
 |li-GRU| **15.5**  | **14.9**|  **14.2** | 
@@ -230,42 +255,52 @@ Results show that, as expected, fMLLR features outperform MFCCs and FBANKs coeff
 
 The best results are actually obtained with a more complex architecture that combines MFCC, FBANK, and fMLLR features (see *cfg/TIMI_baselines/TIMIT_mfcc_fbank_fmllr_liGRU_best.cfg*). To the best of our knowledge, the **PER=13.8\%** achieved by the latter system yields the best-published performance on the TIMIT test-set. 
 
+The Simple Recurrent Units (SRU) is an efficient and highly parallelizable recurrent model. Its performance on ASR is worse than standard LSTM, GRU, and Li-GRU models, but it is significantly faster. SRU is implemented [here](https://github.com/taolei87/sru) and described in the following paper:
+
+T. Lei, Y. Zhang, S. I. Wang, H. Dai, Y. Artzi, "Simple Recurrent Units for Highly Parallelizable Recurrence, Proc. of EMNLP 2018. [arXiv](https://arxiv.org/pdf/1709.02755.pdf)
+
+To do experiments with this model, use the config file *cfg/TIMIT_baselines/TIMIT_SRU_fbank.cfg*. Before you should install the model using ```pip install sru``` and you should uncomment "import sru" in *neural_networks.py*.
+
+
 You can directly compare your results with ours by going [here](https://bitbucket.org/mravanelli/pytorch-kaldi-exp-timit/src/master/). In this external repository, you can find all the folders containing the generated files.
 
 ## Librispeech tutorial
 The steps to run PyTorch-Kaldi on the Librispeech dataset are similar to that reported above for TIMIT. The following tutorial is based on the *100h sub-set*, but it can be easily extended to the full dataset (960h).
 
-1. Run the Kaldi recipe for librispeech (at least until # decode using the tri4b model)
-
-2. Compute the fmllr features by running:
+1. Run the Kaldi recipe for librispeech at least until Stage 13 (included)
+2. Copy exp/tri4b/trans.* files into exp/tri4b/decode_tgsmall_train_clean_100/
+```
+mkdir exp/tri4b/decode_tgsmall_train_clean_100 && cp exp/tri4b/trans.* exp/tri4b/decode_tgsmall_train_clean_100/
+```
+3. Compute the fmllr features by running the following script. 
 
 ```
 . ./cmd.sh ## You'll want to change cmd.sh to something that will work on your system.
 . ./path.sh ## Source the tools/utils (import the queue.pl)
 
-chunk=train_clean_100
-#chunk=dev_clean # Uncomment to process dev
-#chunk=test_clean # Uncomment to process test
 gmmdir=exp/tri4b
 
-dir=fmllr/$chunk
-steps/nnet/make_fmllr_feats.sh --nj 10 --cmd "$train_cmd" \
-    --transform-dir $gmmdir/decode_tgsmall_$chunk \
-        $dir data/$chunk $gmmdir $dir/log $dir/data || exit 1
-        
-compute-cmvn-stats --spk2utt=ark:data/$chunk/spk2utt scp:fmllr/$chunk/feats.scp ark:$dir/data/cmvn_speaker.ark
+for chunk in train_clean_100 dev_clean test_clean; do
+    dir=fmllr/$chunk
+    steps/nnet/make_fmllr_feats.sh --nj 10 --cmd "$train_cmd" \
+        --transform-dir $gmmdir/decode_tgsmall_$chunk \
+            $dir data/$chunk $gmmdir $dir/log $dir/data || exit 1
+
+    compute-cmvn-stats --spk2utt=ark:data/$chunk/spk2utt scp:fmllr/$chunk/feats.scp ark:$dir/data/cmvn_speaker.ark
+done
 ```
 
-3. compute aligmenents using:
+4. compute aligmenents using:
 ```
 # aligments on dev_clean and test_clean
+steps/align_fmllr.sh --nj 30 data/train_clean_100 data/lang exp/tri4b exp/tri4b_ali_clean_100
 steps/align_fmllr.sh --nj 10 data/dev_clean data/lang exp/tri4b exp/tri4b_ali_dev_clean_100
 steps/align_fmllr.sh --nj 10 data/test_clean data/lang exp/tri4b exp/tri4b_ali_test_clean_100
 ```
 
-4. run the experiments with the following command:
+5. run the experiments with the following command:
 ```
-  python run_exp.py cfg/Librispeech_baselines/libri_MLP_fmllr.cfg.
+  python run_exp.py cfg/Librispeech_baselines/libri_MLP_fmllr.cfg
 ```
 
 If you would like to use a recurrent model you can use *libri_RNN_fmllr.cfg*, *libri_LSTM_fmllr.cfg*, *libri_GRU_fmllr.cfg*, or *libri_liGRU_fmllr.cfg*. The training of recurrent models might take some days (depending on the adopted GPU).  The performance obtained with the tgsmall graph are reported in the following table:
@@ -662,8 +697,7 @@ Moreover, you can take a look into our utility called save_raw_fea.py. This scri
 ## How can I transcript my own audio files
 The current version of Pytorch-Kaldi supports the standard production process of using a Pytorch-Kaldi pre-trained acoustic model to transcript one or multiples .wav files. It is important to understand that you must have a trained Pytorch-Kaldi model. While you don't need labels or alignments anymore, Pytorch-Kaldi still needs many files to transcript a new audio file:
 1. The features and features list *feats.scp* (with .ark files, see #how-can-i-plug-my-own-features)
-2. The decoding graph (usually created with mkgraph.sh during previous model training such as triphones models)
-3. The *final.mdl* file that has been used to create the acoustic features (only for decoding, not mandatory if you have your custom decoding script)
+2. The decoding graph (usually created with mkgraph.sh during previous model training such as triphones models). This graph is not needed if you're not decoding.
 
 Once you have all these files, you can start adding your dataset section to the global configuration file. The easiest way is to copy the *cfg* file used to train your acoustic model and just modify by adding a new *[dataset]*:
 ```
@@ -685,7 +719,30 @@ train_with = TIMIT_tr
 valid_with = TIMIT_dev
 forward_with = myWavFile
 ```
-The key string for your audio file transcription is *lab_name=none*. The *none* tag asks Pytorch-Kaldi to enter a *production* mode that only does the forward propagation and decoding without any labels. You don't need TIMIT_tr and TIMIT_dev to be on your production server since Pytorch-Kaldi will skip this information to directly go to the forward phase of the dataset given in the *forward_with* field. As you can see, the global *fea* field requires the exact same parameters than standard training or testing dataset, while the *lab* field only requires two parameters. Please, note that *lab_data_folder* is nothing more than the same path as *fea_lst*. Finally, you still need to specify the number of chunks you want to create to process this file (1 hour = 1 chunk). In a production scenario, you might need to transcript a huge number of audio files, and you don't want to create as much as needed .cfg file. In this extent, and after creating this initial production .cfg file (you can leave the path blank), you can call the run_exp.py script with specific arguments referring to your different.wav features:
+The key string for your audio file transcription is *lab_name=none*. The *none* tag asks Pytorch-Kaldi to enter a *production* mode that only does the forward propagation and decoding without any labels. You don't need TIMIT_tr and TIMIT_dev to be on your production server since Pytorch-Kaldi will skip this information to directly go to the forward phase of the dataset given in the *forward_with* field. As you can see, the global *fea* field requires the exact same parameters than standard training or testing dataset, while the *lab* field only requires two parameters. Please, note that *lab_data_folder* is nothing more than the same path as *fea_lst*. Finally, you still need to specify the number of chunks you want to create to process this file (1 hour = 1 chunk).<br /> 
+**WARNINGS** <br />
+In your standard .cfg, you might have used keywords such as *N_out_lab_cd* that can not be used anymore. Indeed, in a production scenario, you don't want to have the training data on your machine. Therefore, all the *variables* that were on your .cfg file must be replaced by their true values. To replace all the *N_out_{mono,lab_cd}* you can take a look at the output of:
+```
+hmm-info /path/to/the/final.mdl/used/to/generate/the/training/ali
+```
+Then, if you normalize posteriors as (check in your .cfg Section forward):
+```
+normalize_posteriors = True
+normalize_with_counts_from = lab_cd
+```
+You must replace *lab_cd* by:
+```
+normalize_posteriors = True
+normalize_with_counts_from = /path/to/ali_train_pdf.counts
+```
+This normalization step is crucial for HMM-DNN speech recognition. DNNs, in fact, provide posterior probabilities, while HMMs are generative models that work with likelihoods. To derive the required likelihoods, one can simply divide the posteriors by the prior probabilities. To create this *ali_train_pdf.counts* file you can follow:
+```
+alidir=/path/to/the/exp/tri_ali (change it with your path to the exp with the ali)
+num_pdf=$(hmm-info $alidir/final.mdl | awk '/pdfs/{print $4}')
+labels_tr_pdf="ark:ali-to-pdf $alidir/final.mdl \"ark:gunzip -c $alidir/ali.*.gz |\" ark:- |"
+analyze-counts --verbose=1 --binary=false --counts-dim=$num_pdf "$labels_tr_pdf" ali_train_pdf.counts
+```
+et voilà ! In a production scenario, you might need to transcript a huge number of audio files, and you don't want to create as much as needed .cfg file. In this extent, and after creating this initial production .cfg file (you can leave the path blank), you can call the run_exp.py script with specific arguments referring to your different.wav features:
 ```
 python run_exp.py cfg/TIMIT_baselines/TIMIT_MLP_fbank_prod.cfg --dataset4,fea,0,fea_lst="myWavFilePath/data/feats.scp" --dataset4,lab,0,lab_data_folder="myWavFilePath/data/" --dataset4,lab,0,lab_graph="myWavFilePath/exp/tri3/graph/"
 ```
